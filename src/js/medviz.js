@@ -5,6 +5,39 @@ import { BaseApp } from "./baseApp";
 import { APPCONFIG } from "./appConfig";
 import { LabelManager } from "./LabelManager";
 import bootstrap from "bootstrap";
+// Shaders
+const vshader = `
+void main() {
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`
+
+const fshader = `
+    precision mediump sampler3D;
+
+    uniform vec3 u_color;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform sampler3D u_data;
+
+    float plot(vec2 st) {
+        return smoothstep(0.01, 0.0, abs(st.y - st.x));
+    }
+
+    void main() {
+        vec3 color = vec3(0.6);
+
+        gl_FragColor = texture(u_data, gl_FragCoord.xyz);
+    }
+`
+
+const uniforms = {
+    u_color: { value: new THREE.Color(0xff0000)},
+    u_time: { value: 0.0},
+    u_mouse: { value: {x: 0.0, y: 0.0}},
+    u_resolution: { value: {x:0, y:0}},
+    u_data: { value: null}
+};
 
 class MedViz extends BaseApp {
     constructor() {
@@ -56,30 +89,51 @@ class MedViz extends BaseApp {
 
         // Add ground
         //this.addGroundPlane();
+        uniforms.u_resolution.value.x = window.innerWidth;
+        uniforms.u_resolution.value.y = window.innerHeight;
+        /*
+        let planeGeom = new THREE.PlaneBufferGeometry(10, 10);
+        let planeMat = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: vshader,
+            fragmentShader: fshader
+        });
 
-        // Add texture data to scene
-        const VOL_X = 256;
-        const VOL_Y = 256;
-        const VOL_Z = 5;
-        const numBytes = VOL_X * VOL_Y * VOL_Z;
-        let volumeData = new Float32Array(numBytes);
-        for (let i=0; i<numBytes; ++i) {
-            volumeData[i] = 128;
+        let plane = new THREE.Mesh(planeGeom, planeMat);
+        this.root.add(plane);
+        */
+
+        const TEXTURE_SIZE_X = 20;
+        const TEXTURE_SIZE_Y = 20;
+        const TEXTURE_SIZE_Z = 20;
+        const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
+        let textureData = new Uint8Array(totalBytes);
+        for (let i=0; i<totalBytes; ++i) {
+            textureData[i] = 128;
         }
-        let texture3D = new THREE.DataTexture3D(volumeData, VOL_X, VOL_Y, VOL_Z);
-        texture3D.format = THREE.RedFormat;
-        texture3D.type = THREE.FloatType;
+
+        let texture3D = new THREE.DataTexture3D(textureData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z);
+        texture3D.format = THREE.LuminanceFormat;
+        texture3D.type = THREE.UnsignedByteType;
         texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
         texture3D.unpackAlignment = 1;
 
-        let cubeGeom = new THREE.BoxBufferGeometry(VOL_X, VOL_Y, VOL_Z);
-        let cubeMat = new THREE.MeshLambertMaterial( { map: texture3D});
+        uniforms.u_data.value = texture3D;
+
+        let cubeMat = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: vshader,
+            fragmentShader: fshader
+        });
+
+        let cubeGeom = new THREE.BoxBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
         let cube = new THREE.Mesh(cubeGeom, cubeMat);
         this.root.add(cube);
     }
 
     update() {
         let delta = this.clock.getDelta();
+        uniforms.u_time.value = this.clock.getElapsedTime();
 
         if (this.cameraRotate) {
             this.root.rotation[this.rotAxis] += (this.rotSpeed * this.rotDirection * delta);
@@ -102,6 +156,13 @@ class MedViz extends BaseApp {
         }
 
         super.update();
+    }
+
+    windowResize(event) {
+        uniforms.u_resolution.value.x = window.innerWidth;
+        uniforms.u_resolution.value.y = window.innerHeight;
+
+        super.windowResize(event);
     }
 
     rotateCamera(status, direction) {

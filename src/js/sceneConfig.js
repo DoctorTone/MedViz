@@ -11,8 +11,8 @@ const SceneConfig = {
     },
     CameraPos: {
         x: 0,
-        y: 150,
-        z: 300
+        y: 0,
+        z: 50
     },
     LookAtPos: {
         x: 0,
