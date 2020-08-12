@@ -28,6 +28,8 @@ const fshader = `
         vec3 color = vec3(0.6);
 
         gl_FragColor = texture(u_data, gl_FragCoord.xyz);
+        //gl_FragColor = vec4(vec3(0.0), 1.0);
+        gl_FragColor.a = texture(u_data, gl_FragCoord.xyz).a;
     }
 `
 
@@ -109,7 +111,7 @@ class MedViz extends BaseApp {
         const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
         let textureData = new Uint8Array(totalBytes);
         for (let i=0; i<totalBytes; ++i) {
-            textureData[i] = 128;
+            textureData[i] = 0;
         }
 
         let texture3D = new THREE.DataTexture3D(textureData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z);
@@ -121,6 +123,8 @@ class MedViz extends BaseApp {
         uniforms.u_data.value = texture3D;
 
         let cubeMat = new THREE.ShaderMaterial({
+            blending: THREE.NormalBlending,
+            transparent: true,
             uniforms: uniforms,
             vertexShader: vshader,
             fragmentShader: fshader
