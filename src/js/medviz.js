@@ -7,7 +7,10 @@ import { LabelManager } from "./LabelManager";
 import bootstrap from "bootstrap";
 // Shaders
 const vshader = `
+    varying vec2 vUv;
+
 void main() {
+    vUv = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `
@@ -19,17 +22,22 @@ const fshader = `
     uniform vec2 u_resolution;
     uniform float u_time;
     uniform sampler3D u_data;
+    varying vec2 vUv;
 
     float plot(vec2 st) {
         return smoothstep(0.01, 0.0, abs(st.y - st.x));
     }
 
     void main() {
-        vec3 color = vec3(0.6);
-
-        gl_FragColor = texture(u_data, gl_FragCoord.xyz);
+        vec3 texCoords = vec3(vUv, 0.0);
+        float intensity = texture(u_data, texCoords).r;
+        vec3 color = vec3(intensity, intensity, intensity);
+        gl_FragColor = vec4(color, 1.0);
         //gl_FragColor = vec4(vec3(0.0), 1.0);
-        gl_FragColor.a = texture(u_data, gl_FragCoord.xyz).a;
+        //gl_FragColor = texture(u_data, texCoords);
+        
+        //gl_FragColor = texture(color, texCoords);
+        //gl_FragColor.a = 0.5;
     }
 `
 
@@ -84,6 +92,7 @@ class MedViz extends BaseApp {
     createScene() {
         // Init base createsScene
         super.createScene();
+
         // Create root object.
         this.root = new THREE.Object3D();
         this.addToScene(this.root);
@@ -93,6 +102,66 @@ class MedViz extends BaseApp {
         //this.addGroundPlane();
         uniforms.u_resolution.value.x = window.innerWidth;
         uniforms.u_resolution.value.y = window.innerHeight;
+
+        // Get images
+        const TEXTURE_SIZE_X = 160;
+        const TEXTURE_SIZE_Y = 256;
+        const TEXTURE_SIZE_Z = 1;
+        const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
+        //let textureData = new Uint8Array(totalBytes);
+        let texture3D;
+        let _this = this;
+
+        let brainImage = new THREE.ImageLoader().load(
+            "../../textures/cns_tra750.bmp",
+
+            function(image) {
+                console.log("Image loaded");
+                var canvas = document.createElement( 'canvas' );
+                canvas.width = TEXTURE_SIZE_X;
+                canvas.height = TEXTURE_SIZE_Y;
+                var context = canvas.getContext( '2d' );
+                context.drawImage( image, 0, 0, TEXTURE_SIZE_X, TEXTURE_SIZE_Y );
+                let textureData = context.getImageData(0, 0, TEXTURE_SIZE_X, TEXTURE_SIZE_Y);
+
+                const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y;
+                const partialBytes = totalBytes;
+                
+                //let testData = new Uint8Array(totalBytes);
+                let intensityData = new Uint8Array(totalBytes);
+                for (let i=0; i<totalBytes; ++i) {
+                    intensityData[i] = textureData.data[i*4];
+                }
+
+                texture3D = new THREE.DataTexture3D(intensityData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z);
+                texture3D.format = THREE.RedFormat;
+                texture3D.type = THREE.UnsignedByteType;
+                texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
+
+                texture3D.unpackAlignment = 1;
+
+                uniforms.u_data.value = texture3D;
+
+                let cubeMat = new THREE.ShaderMaterial({
+                    blending: THREE.NormalBlending,
+                    transparent: true,
+                    uniforms: uniforms,
+                    vertexShader: vshader,
+                    fragmentShader: fshader
+                });
+
+                let cubeGeom = new THREE.BoxBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
+                let cube = new THREE.Mesh(cubeGeom, cubeMat);
+                _this.root.add(cube);
+            },
+
+            undefined,
+
+            function(error) {
+                console.log("An error occurred = ", error);
+            }
+        );
+
         /*
         let planeGeom = new THREE.PlaneBufferGeometry(10, 10);
         let planeMat = new THREE.ShaderMaterial({
@@ -105,34 +174,11 @@ class MedViz extends BaseApp {
         this.root.add(plane);
         */
 
-        const TEXTURE_SIZE_X = 20;
-        const TEXTURE_SIZE_Y = 20;
-        const TEXTURE_SIZE_Z = 20;
-        const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
-        let textureData = new Uint8Array(totalBytes);
+        /*
         for (let i=0; i<totalBytes; ++i) {
             textureData[i] = 0;
         }
-
-        let texture3D = new THREE.DataTexture3D(textureData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z);
-        texture3D.format = THREE.LuminanceFormat;
-        texture3D.type = THREE.UnsignedByteType;
-        texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
-        texture3D.unpackAlignment = 1;
-
-        uniforms.u_data.value = texture3D;
-
-        let cubeMat = new THREE.ShaderMaterial({
-            blending: THREE.NormalBlending,
-            transparent: true,
-            uniforms: uniforms,
-            vertexShader: vshader,
-            fragmentShader: fshader
-        });
-
-        let cubeGeom = new THREE.BoxBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
-        let cube = new THREE.Mesh(cubeGeom, cubeMat);
-        this.root.add(cube);
+        */
     }
 
     update() {
