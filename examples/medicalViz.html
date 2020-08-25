@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Medical Visualisation</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+	<div id="inset"></div>
+
+	<script type="module">
+		import * as THREE from '../build/three.module.js';
+
+		import { TrackballControls  } from './jsm/controls/TrackballControls.js';
+		import { NRRDLoader } from './jsm/loaders/NRRDLoader.js';
+		import { WEBGL } from './jsm/WebGL.js';
+
+		if ( WEBGL.isWebGL2Available() === false ) {
+
+			document.body.appendChild( WEBGL.getWebGL2ErrorMessage() );
+
+		}
+
+		// Shaders
+		const vshader = `
+			varying vec4 texPosition;
+
+			void main() {
+				texPosition = modelMatrix * vec4(position, 1.0);
+				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+			}
+		`
+
+		const fshader = `
+			precision mediump sampler3D;
+
+			uniform vec3 u_color;
+			uniform vec2 u_resolution;
+			uniform float u_time;
+			uniform sampler3D u_data;
+
+			varying vec4 texPosition;
+
+			void main() {
+				vec3 texCoords = vec3((texPosition.x/160.0), (texPosition.y/256.0), (texPosition.z/221.0));
+				//vec3 texCoords = vec3(1.0, 1.0, 0.0);
+				//float intensity = texture(u_data, texCoords).r;
+				//vec3 color = vec3(intensity, intensity, intensity);
+				//vec3 intensity = texture(u_data, texCoords);
+				gl_FragColor = texture(u_data, texCoords);
+				if (gl_FragColor.r < 0.15) {
+					discard;
+				}
+				//gl_FragColor = vec4(texCoords, 1.0);
+				
+				//gl_FragColor = vec4(vec3(0.0), 1.0);
+				//gl_FragColor = texture(u_data, texCoords);
+				
+				//gl_FragColor = texture(color, texCoords);
+				//gl_FragColor.a = 0.5;
+			}
+		`
+		const uniforms = {
+			u_color: { value: new THREE.Color(0xff0000)},
+			u_time: { value: 0.0},
+			u_mouse: { value: {x: 0.0, y: 0.0}},
+			u_resolution: { value: {x:0, y:0}},
+			u_data: { value: null}
+		};
+
+		let renderer,
+			scene,
+			camera,
+			controls,
+			material,
+			volconfig,
+			cmtextures;
+
+		init();
+		animate();
+
+		function init() {
+
+			scene = new THREE.Scene();
+
+			// Create renderer
+			var canvas = document.createElement( 'canvas' );
+			var context = canvas.getContext( 'webgl2', { alpha: true, antialias: true } );
+			renderer = new THREE.WebGLRenderer( { canvas: canvas, context: context } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+			// Create camera (The volume renderer does not work very well with perspective yet)
+			var h = 512; // frustum height
+			var aspect = window.innerWidth / window.innerHeight;
+			camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000);
+			camera.position.set( 0, 0, 0 );
+
+			// Create controls
+			controls = new TrackballControls( camera, renderer.domElement );
+			//controls.addEventListener( 'change', render );
+			controls.staticMoving = true;
+        	controls.dynamicDampingFactor = 0.3;
+			controls.rotateSpeed = 1.0;
+			controls.zoomSpeed = 1.2;
+			controls.panSpeed = 0.8;
+
+			// Disable controls
+			const controlsDisabled = false;
+			controls.noRotate = controlsDisabled;
+			controls.noZoom = controlsDisabled;
+			controls.noPan = controlsDisabled;
+		
+			controls.keys = [ 65, 83, 68 ];
+			let lookAt = new THREE.Vector3(0, 0, 0);
+        	controls.target.copy(lookAt);
+			//controls.update();
+
+			uniforms.u_resolution.value.x = window.innerWidth;
+			uniforms.u_resolution.value.y = window.innerHeight;
+			
+			// scene.add( new AxesHelper( 128 ) );
+
+			// Lighting is baked into the shader a.t.m.
+			// var dirLight = new DirectionalLight( 0xffffff );
+
+			// Load the data ...
+			new NRRDLoader().load( "models/nrrd/MRIDataPNG.nrrd", function ( volume ) {
+
+				// Texture to hold the volume. We have scalars, so we put our data in the red channel.
+				// THREEJS will select R32F (33326) based on the THREE.RedFormat and THREE.FloatType.
+				// Also see https://www.khronos.org/registry/webgl/specs/latest/2.0/#TEXTURE_TYPES_FORMATS_FROM_DOM_ELEMENTS_TABLE
+				// TODO: look the dtype up in the volume metadata
+				const TEXTURE_SIZE_X = volume.xLength;
+				const TEXTURE_SIZE_Y = volume.yLength;
+				const TEXTURE_SIZE_Z = volume.zLength;
+				
+				// DEBUG
+				
+				const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
+				let testData = new Uint8Array(totalBytes);
+				for (let i=0; i<totalBytes; ++i) {
+					testData[i] = 128;
+				}
+
+				const numBytesPerSlice = TEXTURE_SIZE_X * TEXTURE_SIZE_Y;
+				//const numSlices = 1 * numBytesPerSlice;
+				
+				for (let i=0; i<numBytesPerSlice*1; ++i) {
+					//testData[i] = i % 2 ? 0 : 255;
+					//volume.data[i] = 0;
+				}
+				for (let i=numBytesPerSlice; i<numBytesPerSlice*2; ++i) {
+					//testData[i] = i % 2 ? 0 : 255;
+					//testData[i] = 128;
+				}
+				
+
+				let texture3D = new THREE.DataTexture3D( volume.data, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
+				//let texture3D = new THREE.DataTexture3D( testData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
+				texture3D.format = THREE.LuminanceFormat;
+				texture3D.type = THREE.UnsignedByteType;
+				texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
+				texture3D.unpackAlignment = 1;
+				
+				
+				texture3D.wrapS = THREE.RepeatWrapping;
+				texture3D.wrapT = THREE.RepeatWrapping;
+				texture3D.wrapR = THREE.RepeatWrapping;
+				texture3D.repeat.set(1, 1, 1);
+				
+
+				uniforms.u_data.value = texture3D;
+
+				let cubeMat = new THREE.ShaderMaterial({
+					transparent: true,
+					uniforms: uniforms,
+					vertexShader: vshader,
+					fragmentShader: fshader
+				});
+
+				let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
+				// THREE.Mesh
+				
+				const numSlices = 221;
+				let currentPos = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 0);
+				const zInc = 1.0;
+				let sliceGeom = new THREE.PlaneBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y);
+				let currentSlice;
+
+				for (let i=0; i<numSlices; ++i) {
+					currentSlice = new THREE.Mesh(sliceGeom, cubeMat);
+					currentSlice.position.copy(currentPos);
+					scene.add(currentSlice);
+					currentPos.z += zInc;
+				}
+
+				camera.position.set( TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 400 );
+				lookAt = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 0);
+        		controls.target.copy(lookAt);
+
+				let ambientLight = new THREE.AmbientLight(0x383838);
+				scene.add(ambientLight);
+				
+				let pointLight = new THREE.PointLight(0xffffff);
+				pointLight.position.set(200,200,300);
+				pointLight.name = 'PointLight';
+				scene.add(pointLight);
+
+				let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
+				
+				let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
+				cube2.position.set(80, 0, 0);
+				scene.add(cube2);
+
+				// Plane box intersection
+				let planeNormal = new THREE.Vector3(1, 1, 1).normalize();
+				//let planeNormal = new THREE.Vector3(0, 0, 1);
+				let intersectPlane = new THREE.Plane(planeNormal, -0.85);
+				let lineStart = new THREE.Vector3(0.5, 0.5, -0.5);
+				let lineEnd = new THREE.Vector3(0.5, 0.5, 0.5);
+				let line = new THREE.Line3(lineStart, lineEnd);
+				let intersectPoint = new THREE.Vector3();
+				intersectPoint = intersectPlane.intersectLine(line, intersectPoint);
+				let test = 0;
+			} );
+
+			window.addEventListener( 'resize', onWindowResize, false );
+
+		}
+
+		function onWindowResize() {
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			var aspect = window.innerWidth / window.innerHeight;
+
+			var frustumHeight = camera.top - camera.bottom;
+
+			camera.left = - frustumHeight * aspect / 2;
+			camera.right = frustumHeight * aspect / 2;
+
+			camera.updateProjectionMatrix();
+
+			render();
+
+		}
+
+		function animate() {
+
+			requestAnimationFrame( animate );
+
+			controls.update();
+
+
+			render();
+
+		}
+
+		function render() {
+
+			renderer.render( scene, camera );
+		}
+
+	</script>
+
+</body>
+</html>
