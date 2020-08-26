@@ -138,7 +138,32 @@
 				const TEXTURE_SIZE_Y = volume.yLength;
 				const TEXTURE_SIZE_Z = volume.zLength;
 				
-				// DEBUG
+				// Set up camera
+				camera.position.set( TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 400 );
+				lookAt = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, TEXTURE_SIZE_Z/2);
+        		controls.target.copy(lookAt);
+
+				let ambientLight = new THREE.AmbientLight(0x383838);
+				scene.add(ambientLight);
+				
+				let pointLight = new THREE.PointLight(0xffffff);
+				pointLight.position.set(200,200,300);
+				pointLight.name = 'PointLight';
+				scene.add(pointLight);
+
+				let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
+				let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
+				
+				let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
+				cube2.position.set(80, 0, 0);
+				scene.add(cube2);
+
+				// Get bounding sphere
+				const min = new THREE.Vector3(0, 0, 0);
+				const max = new THREE.Vector3(160, 256, 221);
+				let box = new THREE.Box3(min, max);
+				let boundingSphere = new THREE.Sphere();
+				box.getBoundingSphere(boundingSphere);
 				
 				const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
 				let testData = new Uint8Array(totalBytes);
@@ -182,10 +207,82 @@
 					fragmentShader: fshader
 				});
 
-				let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
+				// Set up vertices
+				const vertices = [];
+				// Front vertices
+				vertices.push(new THREE.Vector3(0, 256, 221));
+				vertices.push(new THREE.Vector3(160, 256, 221));
+				vertices.push(new THREE.Vector3(160, 0, 221));
+				vertices.push(new THREE.Vector3(0, 0, 221));
+
+				// Back vertices
+				vertices.push(new THREE.Vector3(0, 256, 0));
+				vertices.push(new THREE.Vector3(160, 256, 0));
+				vertices.push(new THREE.Vector3(160, 0, 0));
+				vertices.push(new THREE.Vector3(0, 0, 0));
+
+				// Lines
+				const lines = [];
+				// Front lines
+				lines.push(new THREE.Line3(vertices[0], vertices[1]));
+				lines.push(new THREE.Line3(vertices[1], vertices[2]));
+				lines.push(new THREE.Line3(vertices[2], vertices[3]));
+				lines.push(new THREE.Line3(vertices[3], vertices[0]));
+
+				// Middle lines
+				lines.push(new THREE.Line3(vertices[0], vertices[4]));
+				lines.push(new THREE.Line3(vertices[1], vertices[5]));
+				lines.push(new THREE.Line3(vertices[2], vertices[6]));
+				lines.push(new THREE.Line3(vertices[3], vertices[7]));
+
+				// Back lines
+				lines.push(new THREE.Line3(vertices[4], vertices[5]));
+				lines.push(new THREE.Line3(vertices[5], vertices[6]));
+				lines.push(new THREE.Line3(vertices[6], vertices[7]));
+				lines.push(new THREE.Line3(vertices[7], vertices[4]));
+
+				const numSlices = 221;
+				// Set up plane
+				// Plane normal
+				let planeNormal = new THREE.Vector3().copy(camera.position);
+				planeNormal.sub(lookAt);
+				planeNormal.normalize();
+
+				// Plane offset
+				let nearest = getClosestVertex(vertices, camera.position);
+				let viewingDir = new THREE.Line3(lookAt, camera.position);
+				let offset = new THREE.Vector3();
+				viewingDir.closestPointToPoint(nearest, false, offset);
+
+				let planeOffset = offset.sub(lookAt).length() * 2;
+				const planeInc = planeOffset / numSlices;
+				planeOffset *= -1;
+				let intersectPlane = new THREE.Plane(planeNormal, planeOffset);
+
+				let intersectPoint = new THREE.Vector3();
+				let intersects;
+				let currentGeometry;
+				let currentMesh;
+
+				for (let slice=0; slice<numSlices; ++slice) {
+					currentGeometry = new THREE.Geometry();
+					for (let i=0, numLines=lines.length; i<numLines; ++i) {
+						intersects = intersectPlane.intersectLine(lines[i], intersectPoint);
+						if (intersects) {
+							currentGeometry.vertices.push(new THREE.Vector3().copy(intersectPoint));
+						}
+					}
+					// Remove duplicates
+					currentGeometry.mergeVertices();
+					orderVertices(currentGeometry);
+					currentMesh = new THREE.Mesh(currentGeometry, cubeMat2);
+					scene.add(currentMesh);
+					
+					intersectPlane.set(planeNormal, ++planeOffset);
+				}
+				
 				// THREE.Mesh
 				
-				const numSlices = 221;
 				let currentPos = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 0);
 				const zInc = 1.0;
 				let sliceGeom = new THREE.PlaneBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y);
@@ -194,42 +291,59 @@
 				for (let i=0; i<numSlices; ++i) {
 					currentSlice = new THREE.Mesh(sliceGeom, cubeMat);
 					currentSlice.position.copy(currentPos);
-					scene.add(currentSlice);
+					// DEBUG
+					//scene.add(currentSlice);
 					currentPos.z += zInc;
 				}
-
-				camera.position.set( TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 400 );
-				lookAt = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 0);
-        		controls.target.copy(lookAt);
-
-				let ambientLight = new THREE.AmbientLight(0x383838);
-				scene.add(ambientLight);
-				
-				let pointLight = new THREE.PointLight(0xffffff);
-				pointLight.position.set(200,200,300);
-				pointLight.name = 'PointLight';
-				scene.add(pointLight);
-
-				let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
-				
-				let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
-				cube2.position.set(80, 0, 0);
-				scene.add(cube2);
-
-				// Plane box intersection
-				let planeNormal = new THREE.Vector3(1, 1, 1).normalize();
-				//let planeNormal = new THREE.Vector3(0, 0, 1);
-				let intersectPlane = new THREE.Plane(planeNormal, -0.85);
-				let lineStart = new THREE.Vector3(0.5, 0.5, -0.5);
-				let lineEnd = new THREE.Vector3(0.5, 0.5, 0.5);
-				let line = new THREE.Line3(lineStart, lineEnd);
-				let intersectPoint = new THREE.Vector3();
-				intersectPoint = intersectPlane.intersectLine(line, intersectPoint);
-				let test = 0;
 			} );
 
 			window.addEventListener( 'resize', onWindowResize, false );
 
+		}
+
+		function orderVertices(geometry) {
+			switch(geometry.vertices.length) {
+				case 3:
+					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					break;
+
+				case 4:
+					geometry.faces.push( new THREE.Face3(0, 2, 1));
+					geometry.faces.push( new THREE.Face3(0, 3, 2));
+					break;
+
+				case 5:
+					geometry.faces.push( new THREE.Face3(0, 1, 4));
+					geometry.faces.push( new THREE.Face3(4, 1, 3));
+					geometry.faces.push( new THREE.Face3(3, 1, 2));
+					break;
+
+				case 6:
+					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					geometry.faces.push( new THREE.Face3(0, 2, 5));
+					geometry.faces.push( new THREE.Face3(5, 2, 4));
+					geometry.faces.push( new THREE.Face3(4, 2, 3));
+					break;
+
+				default:
+					break;
+			}
+		}
+
+		function getClosestVertex(vertices, point) {
+			let nearestDistance = 100000;
+			let distance;
+			let nearestVertex;
+
+			for (let i=0, numVerts=vertices.length; i<numVerts; ++i) {
+				distance = vertices[i].distanceTo(point);
+				if (distance < nearestDistance) {
+					nearestDistance = distance;
+					nearestVertex = i;
+				}
+			}
+
+			return vertices[nearestVertex];
 		}
 
 		function onWindowResize() {
