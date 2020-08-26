@@ -272,28 +272,20 @@
 							currentGeometry.vertices.push(new THREE.Vector3().copy(intersectPoint));
 						}
 					}
+					// Advance plane
+					intersectPlane.set(planeNormal, ++planeOffset);
+
 					// Remove duplicates
 					currentGeometry.mergeVertices();
-					orderVertices(currentGeometry);
-					currentMesh = new THREE.Mesh(currentGeometry, cubeMat2);
-					scene.add(currentMesh);
-					
-					intersectPlane.set(planeNormal, ++planeOffset);
-				}
-				
-				// THREE.Mesh
-				
-				let currentPos = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 0);
-				const zInc = 1.0;
-				let sliceGeom = new THREE.PlaneBufferGeometry( TEXTURE_SIZE_X, TEXTURE_SIZE_Y);
-				let currentSlice;
 
-				for (let i=0; i<numSlices; ++i) {
-					currentSlice = new THREE.Mesh(sliceGeom, cubeMat);
-					currentSlice.position.copy(currentPos);
-					// DEBUG
-					//scene.add(currentSlice);
-					currentPos.z += zInc;
+					// Disregard if co-planer or no intersection at all
+					if (currentGeometry.vertices.length <= 2) {
+						continue;
+					}
+					
+					orderVertices(currentGeometry, camera.matrixWorldInverse);
+					currentMesh = new THREE.Mesh(currentGeometry, cubeMat);
+					scene.add(currentMesh);
 				}
 			} );
 
@@ -301,7 +293,14 @@
 
 		}
 
-		function orderVertices(geometry) {
+		function orderVertices(geometry, viewMatrix) {
+			// Order vertices in anticlockwise order
+			viewMatrix.setPosition(0, 0, 0);
+			let transformedVerts = [];
+			for (let i=0, numVerts=geometry.vertices.length; i<numVerts; ++i) {
+				transformedVerts.push(geometry.vertices[i].applyMatrix3(viewMatrix));
+			}
+			
 			switch(geometry.vertices.length) {
 				case 3:
 					geometry.faces.push( new THREE.Face3(0, 1, 2));
