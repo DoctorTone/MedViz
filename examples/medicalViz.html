@@ -97,7 +97,7 @@
 			var h = 512; // frustum height
 			var aspect = window.innerWidth / window.innerHeight;
 			camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000);
-			camera.position.set( 0, 0, 0 );
+			camera.position.set( 80, 128, 400 );
 
 			// Create controls
 			controls = new TrackballControls( camera, renderer.domElement );
@@ -108,6 +108,11 @@
 			controls.zoomSpeed = 1.2;
 			controls.panSpeed = 0.8;
 
+			// Set up camera
+			let lookAt = new THREE.Vector3(80, 128, 221/2);
+			controls.target.copy(lookAt);
+			controls.update();
+
 			// Disable controls
 			const controlsDisabled = false;
 			controls.noRotate = controlsDisabled;
@@ -115,9 +120,7 @@
 			controls.noPan = controlsDisabled;
 		
 			controls.keys = [ 65, 83, 68 ];
-			let lookAt = new THREE.Vector3(0, 0, 0);
-        	controls.target.copy(lookAt);
-			//controls.update();
+			controls.update();
 
 			uniforms.u_resolution.value.x = window.innerWidth;
 			uniforms.u_resolution.value.y = window.innerHeight;
@@ -137,11 +140,6 @@
 				const TEXTURE_SIZE_X = volume.xLength;
 				const TEXTURE_SIZE_Y = volume.yLength;
 				const TEXTURE_SIZE_Z = volume.zLength;
-				
-				// Set up camera
-				camera.position.set( TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, 400 );
-				lookAt = new THREE.Vector3(TEXTURE_SIZE_X/2, TEXTURE_SIZE_Y/2, TEXTURE_SIZE_Z/2);
-        		controls.target.copy(lookAt);
 
 				let ambientLight = new THREE.AmbientLight(0x383838);
 				scene.add(ambientLight);
@@ -297,9 +295,12 @@
 			// Order vertices in anticlockwise order
 			viewMatrix.setPosition(0, 0, 0);
 			let transformedVerts = [];
+			
 			for (let i=0, numVerts=geometry.vertices.length; i<numVerts; ++i) {
-				transformedVerts.push(geometry.vertices[i].applyMatrix3(viewMatrix));
+				transformedVerts.push(geometry.vertices[i].clone());
+				transformedVerts[i].applyMatrix3(viewMatrix);
 			}
+			
 			
 			switch(geometry.vertices.length) {
 				case 3:
@@ -367,7 +368,6 @@
 			requestAnimationFrame( animate );
 
 			controls.update();
-
 
 			render();
 
