@@ -295,12 +295,23 @@
 			// Order vertices in anticlockwise order
 			viewMatrix.setPosition(0, 0, 0);
 			let transformedVerts = [];
+			let polygonPoints = [];
+			const numVerts = geometry.vertices.length;
 			
-			for (let i=0, numVerts=geometry.vertices.length; i<numVerts; ++i) {
+			for (let i=0; i<numVerts; ++i) {
 				transformedVerts.push(geometry.vertices[i].clone());
 				transformedVerts[i].applyMatrix3(viewMatrix);
+				polygonPoints.push(new THREE.Vector2(transformedVerts[i].x, transformedVerts[i].z));
 			}
 			
+			// Find centre of polygon
+			let centre = new THREE.Vector2();
+			for (let i=0; i<numVerts; ++i) {
+				centre.x += polygonPoints[i].x;
+				centre.y += polygonPoints[i].y;
+			}
+			centre.x /= numVerts;
+			centre.y /= numVerts;
 			
 			switch(geometry.vertices.length) {
 				case 3:
