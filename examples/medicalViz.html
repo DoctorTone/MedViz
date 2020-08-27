@@ -78,6 +78,8 @@
 			volconfig,
 			cmtextures;
 
+		let renderUpdate = false;
+
 		init();
 		animate();
 
@@ -101,7 +103,27 @@
 
 			// Create controls
 			controls = new TrackballControls( camera, renderer.domElement );
-			//controls.addEventListener( 'change', render );
+			controls.addEventListener( 'change', () => {
+				renderUpdate = true;
+			});
+
+			// Lights
+			let ambientLight = new THREE.AmbientLight(0x383838);
+			scene.add(ambientLight);
+			
+			let pointLight = new THREE.PointLight(0xffffff);
+			pointLight.position.set(200,200,300);
+			pointLight.name = 'PointLight';
+			scene.add(pointLight);
+
+			// Reference cube
+			let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
+			let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
+			
+			let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
+			cube2.position.set(80, 0, 0);
+			scene.add(cube2);
+
 			controls.staticMoving = true;
         	controls.dynamicDampingFactor = 0.3;
 			controls.rotateSpeed = 1.0;
@@ -125,6 +147,47 @@
 			uniforms.u_resolution.value.x = window.innerWidth;
 			uniforms.u_resolution.value.y = window.innerHeight;
 			
+			// Set up volume geometries
+			let cubeMat = new THREE.ShaderMaterial({
+				transparent: true,
+				uniforms: uniforms,
+				vertexShader: vshader,
+				fragmentShader: fshader
+			});
+
+			// Set up vertices
+			const vertices = [];
+			// Front vertices
+			vertices.push(new THREE.Vector3(0, 256, 221));
+			vertices.push(new THREE.Vector3(160, 256, 221));
+			vertices.push(new THREE.Vector3(160, 0, 221));
+			vertices.push(new THREE.Vector3(0, 0, 221));
+
+			// Back vertices
+			vertices.push(new THREE.Vector3(0, 256, 0));
+			vertices.push(new THREE.Vector3(160, 256, 0));
+			vertices.push(new THREE.Vector3(160, 0, 0));
+			vertices.push(new THREE.Vector3(0, 0, 0));
+
+			// Lines
+			const lines = [];
+			// Front lines
+			lines.push(new THREE.Line3(vertices[0], vertices[1]));
+			lines.push(new THREE.Line3(vertices[1], vertices[2]));
+			lines.push(new THREE.Line3(vertices[2], vertices[3]));
+			lines.push(new THREE.Line3(vertices[3], vertices[0]));
+
+			// Middle lines
+			lines.push(new THREE.Line3(vertices[0], vertices[4]));
+			lines.push(new THREE.Line3(vertices[1], vertices[5]));
+			lines.push(new THREE.Line3(vertices[2], vertices[6]));
+			lines.push(new THREE.Line3(vertices[3], vertices[7]));
+
+			// Back lines
+			lines.push(new THREE.Line3(vertices[4], vertices[5]));
+			lines.push(new THREE.Line3(vertices[5], vertices[6]));
+			lines.push(new THREE.Line3(vertices[6], vertices[7]));
+			lines.push(new THREE.Line3(vertices[7], vertices[4]));
 			// scene.add( new AxesHelper( 128 ) );
 
 			// Lighting is baked into the shader a.t.m.
@@ -140,28 +203,6 @@
 				const TEXTURE_SIZE_X = volume.xLength;
 				const TEXTURE_SIZE_Y = volume.yLength;
 				const TEXTURE_SIZE_Z = volume.zLength;
-
-				let ambientLight = new THREE.AmbientLight(0x383838);
-				scene.add(ambientLight);
-				
-				let pointLight = new THREE.PointLight(0xffffff);
-				pointLight.position.set(200,200,300);
-				pointLight.name = 'PointLight';
-				scene.add(pointLight);
-
-				let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
-				let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
-				
-				let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
-				cube2.position.set(80, 0, 0);
-				scene.add(cube2);
-
-				// Get bounding sphere
-				const min = new THREE.Vector3(0, 0, 0);
-				const max = new THREE.Vector3(160, 256, 221);
-				let box = new THREE.Box3(min, max);
-				let boundingSphere = new THREE.Sphere();
-				box.getBoundingSphere(boundingSphere);
 				
 				const totalBytes = TEXTURE_SIZE_X * TEXTURE_SIZE_Y * TEXTURE_SIZE_Z;
 				let testData = new Uint8Array(totalBytes);
@@ -181,7 +222,6 @@
 					//testData[i] = 128;
 				}
 				
-
 				let texture3D = new THREE.DataTexture3D( volume.data, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
 				//let texture3D = new THREE.DataTexture3D( testData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
 				texture3D.format = THREE.LuminanceFormat;
@@ -189,55 +229,14 @@
 				texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
 				texture3D.unpackAlignment = 1;
 				
-				
 				texture3D.wrapS = THREE.RepeatWrapping;
 				texture3D.wrapT = THREE.RepeatWrapping;
 				texture3D.wrapR = THREE.RepeatWrapping;
 				texture3D.repeat.set(1, 1, 1);
-				
 
 				uniforms.u_data.value = texture3D;
 
-				let cubeMat = new THREE.ShaderMaterial({
-					transparent: true,
-					uniforms: uniforms,
-					vertexShader: vshader,
-					fragmentShader: fshader
-				});
-
-				// Set up vertices
-				const vertices = [];
-				// Front vertices
-				vertices.push(new THREE.Vector3(0, 256, 221));
-				vertices.push(new THREE.Vector3(160, 256, 221));
-				vertices.push(new THREE.Vector3(160, 0, 221));
-				vertices.push(new THREE.Vector3(0, 0, 221));
-
-				// Back vertices
-				vertices.push(new THREE.Vector3(0, 256, 0));
-				vertices.push(new THREE.Vector3(160, 256, 0));
-				vertices.push(new THREE.Vector3(160, 0, 0));
-				vertices.push(new THREE.Vector3(0, 0, 0));
-
-				// Lines
-				const lines = [];
-				// Front lines
-				lines.push(new THREE.Line3(vertices[0], vertices[1]));
-				lines.push(new THREE.Line3(vertices[1], vertices[2]));
-				lines.push(new THREE.Line3(vertices[2], vertices[3]));
-				lines.push(new THREE.Line3(vertices[3], vertices[0]));
-
-				// Middle lines
-				lines.push(new THREE.Line3(vertices[0], vertices[4]));
-				lines.push(new THREE.Line3(vertices[1], vertices[5]));
-				lines.push(new THREE.Line3(vertices[2], vertices[6]));
-				lines.push(new THREE.Line3(vertices[3], vertices[7]));
-
-				// Back lines
-				lines.push(new THREE.Line3(vertices[4], vertices[5]));
-				lines.push(new THREE.Line3(vertices[5], vertices[6]));
-				lines.push(new THREE.Line3(vertices[6], vertices[7]));
-				lines.push(new THREE.Line3(vertices[7], vertices[4]));
+				
 
 				const numSlices = 221;
 				// Set up plane
@@ -351,6 +350,7 @@
 				geometry.vertices[i] = transformedVerts[i];
 			}
 
+			// Order sorted vertices
 			switch(geometry.vertices.length) {
 				case 3:
 					geometry.faces.push( new THREE.Face3(0, 1, 2));
@@ -424,7 +424,11 @@
 
 		function render() {
 
-			renderer.render( scene, camera );
+			if (renderUpdate) {
+				renderer.render( scene, camera );
+				renderUpdate = false;
+			}
+			
 		}
 
 	</script>
