@@ -40,11 +40,12 @@
 			uniform vec2 u_resolution;
 			uniform float u_time;
 			uniform sampler3D u_data;
+			uniform vec3 u_slices;
 
 			varying vec4 texPosition;
 
 			void main() {
-				vec3 texCoords = vec3((texPosition.x/160.0), (texPosition.y/256.0), (texPosition.z/221.0));
+				vec3 texCoords = vec3((texPosition.x/u_slices.x) + 0.5, (texPosition.y/u_slices.y) + 0.5, (texPosition.z/221.0) + 0.5);
 				//vec3 texCoords = vec3(1.0, 1.0, 0.0);
 				//float intensity = texture(u_data, texCoords).r;
 				//vec3 color = vec3(intensity, intensity, intensity);
@@ -65,6 +66,7 @@
 		const uniforms = {
 			u_color: { value: new THREE.Color(0xff0000)},
 			u_time: { value: 0.0},
+			u_slices: { value: new THREE.Vector3(160, 256, 221)},
 			u_mouse: { value: {x: 0.0, y: 0.0}},
 			u_resolution: { value: {x:0, y:0}},
 			u_data: { value: null}
@@ -79,6 +81,26 @@
 			cmtextures;
 
 		let renderUpdate = false;
+		let numSlices;
+		let lookAt;
+		// Set up vertices
+		const vertices = [];
+		// Lines
+		const lines = [];
+		let cubeMat;
+		let planeNormal = new THREE.Vector3();
+		let viewingDir = new THREE.Line3();
+		let offset = new THREE.Vector3();
+		let planeOffset;
+		const planeInc = 0.5;
+		let intersectPlane = new THREE.Plane();
+		let intersectPoint = new THREE.Vector3();
+		let intersects;
+		let currentGeometry;
+		let currentMesh;
+		let volumeGroup = new THREE.Group();
+		let cubeMat2;
+		let sliceGeomMat;
 
 		init();
 		animate();
@@ -86,6 +108,7 @@
 		function init() {
 
 			scene = new THREE.Scene();
+			scene.add(volumeGroup);
 
 			// Create renderer
 			var canvas = document.createElement( 'canvas' );
@@ -95,11 +118,13 @@
 			renderer.setSize( window.innerWidth, window.innerHeight );
 			document.body.appendChild( renderer.domElement );
 
+			window.addEventListener( 'resize', onWindowResize, false );
+
 			// Create camera (The volume renderer does not work very well with perspective yet)
 			var h = 512; // frustum height
 			var aspect = window.innerWidth / window.innerHeight;
 			camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000);
-			camera.position.set( 80, 128, 400 );
+			camera.position.set( 0, 0, 400 );
 
 			// Create controls
 			controls = new TrackballControls( camera, renderer.domElement );
@@ -117,12 +142,13 @@
 			scene.add(pointLight);
 
 			// Reference cube
-			let cubeGeom2 = new THREE.BoxBufferGeometry( 10, 10, 10 );
-			let cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xff0000, side: THREE.DoubleSide});
+			let cubeGeom2 = new THREE.BoxBufferGeometry( 160, 256, 221 );
+			cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
 			
 			let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
-			cube2.position.set(80, 0, 0);
-			scene.add(cube2);
+			//scene.add(cube2);
+
+			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
 
 			controls.staticMoving = true;
         	controls.dynamicDampingFactor = 0.3;
@@ -131,7 +157,7 @@
 			controls.panSpeed = 0.8;
 
 			// Set up camera
-			let lookAt = new THREE.Vector3(80, 128, 221/2);
+			lookAt = new THREE.Vector3(0, 0, 0);
 			controls.target.copy(lookAt);
 			controls.update();
 
@@ -148,29 +174,34 @@
 			uniforms.u_resolution.value.y = window.innerHeight;
 			
 			// Set up volume geometries
-			let cubeMat = new THREE.ShaderMaterial({
+			cubeMat = new THREE.ShaderMaterial({
 				transparent: true,
+				side: THREE.DoubleSide,
 				uniforms: uniforms,
 				vertexShader: vshader,
 				fragmentShader: fshader
 			});
 
-			// Set up vertices
-			const vertices = [];
+			
 			// Front vertices
-			vertices.push(new THREE.Vector3(0, 256, 221));
-			vertices.push(new THREE.Vector3(160, 256, 221));
-			vertices.push(new THREE.Vector3(160, 0, 221));
-			vertices.push(new THREE.Vector3(0, 0, 221));
+			const LEFT_EDGE_X = -80;
+			const RIGHT_EDGE_X = 80;
+			const TOP_EDGE_Y = 128;
+			const BOTTOM_EDGE_Y = -128;
+			const FRONT_EDGE_Z = 110.5;
+			const BACK_EDGE_Z = -110.5;
+
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
 
 			// Back vertices
-			vertices.push(new THREE.Vector3(0, 256, 0));
-			vertices.push(new THREE.Vector3(160, 256, 0));
-			vertices.push(new THREE.Vector3(160, 0, 0));
-			vertices.push(new THREE.Vector3(0, 0, 0));
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
 
-			// Lines
-			const lines = [];
 			// Front lines
 			lines.push(new THREE.Line3(vertices[0], vertices[1]));
 			lines.push(new THREE.Line3(vertices[1], vertices[2]));
@@ -229,65 +260,66 @@
 				texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
 				texture3D.unpackAlignment = 1;
 				
+				/*
 				texture3D.wrapS = THREE.RepeatWrapping;
 				texture3D.wrapT = THREE.RepeatWrapping;
 				texture3D.wrapR = THREE.RepeatWrapping;
 				texture3D.repeat.set(1, 1, 1);
+				*/
 
 				uniforms.u_data.value = texture3D;
 
-				
-
-				const numSlices = 221;
-				// Set up plane
-				// Plane normal
-				let planeNormal = new THREE.Vector3().copy(camera.position);
-				planeNormal.sub(lookAt);
-				planeNormal.normalize();
-
-				// Plane offset
-				let nearest = getClosestVertex(vertices, camera.position);
-				let viewingDir = new THREE.Line3(lookAt, camera.position);
-				let offset = new THREE.Vector3();
-				viewingDir.closestPointToPoint(nearest, false, offset);
-
-				let planeOffset = offset.sub(lookAt).length() * 2;
-				const planeInc = planeOffset / numSlices;
-				planeOffset *= -1;
-				let intersectPlane = new THREE.Plane(planeNormal, planeOffset);
-
-				let intersectPoint = new THREE.Vector3();
-				let intersects;
-				let currentGeometry;
-				let currentMesh;
-
-				for (let slice=0; slice<numSlices; ++slice) {
-					currentGeometry = new THREE.Geometry();
-					for (let i=0, numLines=lines.length; i<numLines; ++i) {
-						intersects = intersectPlane.intersectLine(lines[i], intersectPoint);
-						if (intersects) {
-							currentGeometry.vertices.push(new THREE.Vector3().copy(intersectPoint));
-						}
-					}
-					// Advance plane
-					intersectPlane.set(planeNormal, ++planeOffset);
-
-					// Remove duplicates
-					currentGeometry.mergeVertices();
-
-					// Disregard if co-planer or no intersection at all
-					if (currentGeometry.vertices.length <= 2) {
-						continue;
-					}
-					
-					orderVertices(currentGeometry, camera.matrixWorldInverse);
-					currentMesh = new THREE.Mesh(currentGeometry, cubeMat);
-					scene.add(currentMesh);
-				}
+				renderUpdate = true;
 			} );
+		}
 
-			window.addEventListener( 'resize', onWindowResize, false );
+		function renderVolume() {
+			// Remove existing geometry
+			scene.remove(volumeGroup);
+			volumeGroup = new THREE.Group();
+			scene.add(volumeGroup);
 
+			// Set up plane
+			// Plane normal
+			planeNormal.copy(camera.position);
+			planeNormal.sub(lookAt);
+			planeNormal.normalize();
+
+			// Plane offset
+			let nearest = getClosestVertex(vertices, camera.position);
+			viewingDir.set(lookAt, camera.position);
+			viewingDir.closestPointToPoint(nearest, false, offset);
+
+			planeOffset = offset.sub(lookAt).length();
+			numSlices = Math.round(planeOffset / planeInc) * 2;
+			uniforms.u_slices.value.z = numSlices;
+			planeOffset *= -1;
+			intersectPlane.set(planeNormal, planeOffset);
+
+			for (let slice=0; slice<numSlices; ++slice) {
+				currentGeometry = new THREE.Geometry();
+				for (let i=0, numLines=lines.length; i<numLines; ++i) {
+					intersects = intersectPlane.intersectLine(lines[i], intersectPoint);
+					if (intersects) {
+						currentGeometry.vertices.push(new THREE.Vector3().copy(intersectPoint));
+					}
+				}
+				// Advance plane
+				planeOffset += planeInc;
+				intersectPlane.set(planeNormal, planeOffset);
+
+				// Remove duplicates
+				currentGeometry.mergeVertices();
+
+				// Disregard if co-planer or no intersection at all
+				if (currentGeometry.vertices.length <= 2) {
+					continue;
+				}
+				
+				orderVertices(currentGeometry, camera.matrixWorldInverse);
+				currentMesh = new THREE.Mesh(currentGeometry, cubeMat);
+				volumeGroup.add(currentMesh);
+			}
 		}
 
 		function compareNumbers(a, b) {
@@ -375,6 +407,7 @@
 					break;
 
 				default:
+					console.log("Too many points = ", geometry.vertices.length);
 					break;
 			}
 		}
@@ -425,6 +458,7 @@
 		function render() {
 
 			if (renderUpdate) {
+				renderVolume();
 				renderer.render( scene, camera );
 				renderUpdate = false;
 			}
