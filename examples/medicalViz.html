@@ -51,9 +51,13 @@
 				//vec3 color = vec3(intensity, intensity, intensity);
 				//vec3 intensity = texture(u_data, texCoords);
 				gl_FragColor = texture(u_data, texCoords);
-				if (gl_FragColor.r < 0.15) {
+				if (gl_FragColor.r < 0.25) {
 					discard;
 				}
+				gl_FragColor.a = gl_FragColor.r;
+				//gl_FragColor.a = 1;
+				//gl_FragColor.rgb *= 5.5;
+				
 				//gl_FragColor = vec4(texCoords, 1.0);
 				
 				//gl_FragColor = vec4(vec3(0.0), 1.0);
@@ -92,7 +96,7 @@
 		let viewingDir = new THREE.Line3();
 		let offset = new THREE.Vector3();
 		let planeOffset;
-		const planeInc = 0.5;
+		const planeInc = 0.25;
 		let intersectPlane = new THREE.Plane();
 		let intersectPoint = new THREE.Vector3();
 		let intersects;
@@ -137,7 +141,7 @@
 			scene.add(ambientLight);
 			
 			let pointLight = new THREE.PointLight(0xffffff);
-			pointLight.position.set(200,200,300);
+			pointLight.position.set(400,400,400);
 			pointLight.name = 'PointLight';
 			scene.add(pointLight);
 
@@ -176,7 +180,7 @@
 			// Set up volume geometries
 			cubeMat = new THREE.ShaderMaterial({
 				transparent: true,
-				side: THREE.DoubleSide,
+				//side: THREE.DoubleSide,
 				uniforms: uniforms,
 				vertexShader: vshader,
 				fragmentShader: fshader
