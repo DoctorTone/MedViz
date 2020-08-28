@@ -96,7 +96,7 @@
 		let viewingDir = new THREE.Line3();
 		let offset = new THREE.Vector3();
 		let planeOffset;
-		const planeInc = 0.25;
+		const planeInc = 0.5;
 		let intersectPlane = new THREE.Plane();
 		let intersectPoint = new THREE.Vector3();
 		let intersects;
@@ -195,18 +195,19 @@
 			const FRONT_EDGE_Z = 110.5;
 			const BACK_EDGE_Z = -110.5;
 
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
-
 			// Back vertices
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
 			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
 			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
 			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
 
-			// Front lines
+			// Front vertices
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
+			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+
+			// Back lines
 			lines.push(new THREE.Line3(vertices[0], vertices[1]));
 			lines.push(new THREE.Line3(vertices[1], vertices[2]));
 			lines.push(new THREE.Line3(vertices[2], vertices[3]));
@@ -214,11 +215,11 @@
 
 			// Middle lines
 			lines.push(new THREE.Line3(vertices[0], vertices[4]));
-			lines.push(new THREE.Line3(vertices[1], vertices[5]));
-			lines.push(new THREE.Line3(vertices[2], vertices[6]));
 			lines.push(new THREE.Line3(vertices[3], vertices[7]));
+			lines.push(new THREE.Line3(vertices[2], vertices[6]));
+			lines.push(new THREE.Line3(vertices[1], vertices[5]));
 
-			// Back lines
+			// Front lines
 			lines.push(new THREE.Line3(vertices[4], vertices[5]));
 			lines.push(new THREE.Line3(vertices[5], vertices[6]));
 			lines.push(new THREE.Line3(vertices[6], vertices[7]));
@@ -353,6 +354,7 @@
 			centre.y /= numVerts;
 			
 			//Calculate angles between all vertices and centre
+			
 			let dx, dy;
 			let angles = [];
 			for (let i=0; i<numVerts; ++i) {
@@ -366,6 +368,13 @@
 					angles[i] = 4 + angles[i];
 				}
 			}
+			
+			/*
+			let angles = [];
+			for (let i=0; i<numVerts; ++i) {
+				angles.push(polygonPoints[i].angle());
+			}
+			*/
 
 			// Sort angles - lowest first
 			let sortedAngles = [...angles];
