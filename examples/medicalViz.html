@@ -116,6 +116,7 @@
 		let sliceGeomMat;
 		let startSlice = 0;
 		let endSlice = 1;
+		let redMaterial;
 		const MIN_SLICE = 0;
 		const MAX_SLICE = 221;
 		let displayElem = document.getElementById("sliceNum");
@@ -187,8 +188,9 @@
 			let cubeGeom2 = new THREE.BoxBufferGeometry( 160, 256, 221 );
 			wireframe = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
 			
-			let cube2 = new THREE.Mesh(cubeGeom2, wireframe);
-			//scene.add(cube2);
+			redMaterial = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: true } );
+			let cube2 = new THREE.Mesh(cubeGeom2, redMaterial);
+			scene.add(cube2);
 
 			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
 
@@ -573,7 +575,7 @@
 		function orderFaces(geometry) {
 			switch(geometry.vertices.length) {
 				case 3:
-					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					geometry.faces.push( new THREE.Face3(0, 2, 1));
 					break;
 
 				case 4:
