@@ -51,10 +51,13 @@
 				//vec3 color = vec3(intensity, intensity, intensity);
 				//vec3 intensity = texture(u_data, texCoords);
 				gl_FragColor = texture(u_data, texCoords);
-				if (gl_FragColor.r < 0.25) {
+				if (gl_FragColor.r < 0.5) {
 					discard;
 				}
-				gl_FragColor.a = gl_FragColor.r;
+				gl_FragColor.g = gl_FragColor.b = gl_FragColor.a = gl_FragColor.r;
+				//gl_FragColor.rgb *= 5.0;
+				//gl_FragColor.a = 0.75;
+				//gl_FragColor.rgb *= 10.0;
 				//gl_FragColor.a = 1;
 				//gl_FragColor.rgb *= 5.5;
 				
@@ -88,15 +91,16 @@
 		let numSlices;
 		let lookAt;
 		// Set up vertices
-		const vertices = [];
+		const volumeVertices = [];
 		// Lines
-		const lines = [];
-		let cubeMat;
+		const volumeLines = [];
+		let lineIndices = [];
+		let volumeShader;
 		let planeNormal = new THREE.Vector3();
 		let viewingDir = new THREE.Line3();
 		let offset = new THREE.Vector3();
 		let planeOffset;
-		const planeInc = 0.5;
+		const planeInc = 0.25;
 		let intersectPlane = new THREE.Plane();
 		let intersectPoint = new THREE.Vector3();
 		let intersects;
@@ -163,7 +167,6 @@
 			// Set up camera
 			lookAt = new THREE.Vector3(0, 0, 0);
 			controls.target.copy(lookAt);
-			controls.update();
 
 			// Disable controls
 			const controlsDisabled = false;
@@ -178,8 +181,10 @@
 			uniforms.u_resolution.value.y = window.innerHeight;
 			
 			// Set up volume geometries
-			cubeMat = new THREE.ShaderMaterial({
+			volumeShader = new THREE.ShaderMaterial({
 				transparent: true,
+				//opacity: 0.5,
+				blending: THREE.NormalBlending,
 				//side: THREE.DoubleSide,
 				uniforms: uniforms,
 				vertexShader: vshader,
@@ -195,35 +200,32 @@
 			const FRONT_EDGE_Z = 110.5;
 			const BACK_EDGE_Z = -110.5;
 
-			// Back vertices
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
+			// Vertices
+			volumeVertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
 
-			// Front vertices
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, TOP_EDGE_Y, FRONT_EDGE_Z));
-			vertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(LEFT_EDGE_X, TOP_EDGE_Y, BACK_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(RIGHT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, FRONT_EDGE_Z));
+			volumeVertices.push(new THREE.Vector3(LEFT_EDGE_X, BOTTOM_EDGE_Y, BACK_EDGE_Z));
 
-			// Back lines
-			lines.push(new THREE.Line3(vertices[0], vertices[1]));
-			lines.push(new THREE.Line3(vertices[1], vertices[2]));
-			lines.push(new THREE.Line3(vertices[2], vertices[3]));
-			lines.push(new THREE.Line3(vertices[3], vertices[0]));
+			// Lines
+			volumeLines.push(new THREE.Line3(volumeVertices[0], volumeVertices[1]));
+			volumeLines.push(new THREE.Line3(volumeVertices[1], volumeVertices[4]));
+			volumeLines.push(new THREE.Line3(volumeVertices[4], volumeVertices[7]));
+			volumeLines.push(new THREE.Line3(volumeVertices[1], volumeVertices[5]));
 
-			// Middle lines
-			lines.push(new THREE.Line3(vertices[0], vertices[4]));
-			lines.push(new THREE.Line3(vertices[3], vertices[7]));
-			lines.push(new THREE.Line3(vertices[2], vertices[6]));
-			lines.push(new THREE.Line3(vertices[1], vertices[5]));
+			volumeLines.push(new THREE.Line3(volumeVertices[0], volumeVertices[2]));
+			volumeLines.push(new THREE.Line3(volumeVertices[2], volumeVertices[5]));
+			volumeLines.push(new THREE.Line3(volumeVertices[5], volumeVertices[7]));
+			volumeLines.push(new THREE.Line3(volumeVertices[2], volumeVertices[6]));
 
-			// Front lines
-			lines.push(new THREE.Line3(vertices[4], vertices[5]));
-			lines.push(new THREE.Line3(vertices[5], vertices[6]));
-			lines.push(new THREE.Line3(vertices[6], vertices[7]));
-			lines.push(new THREE.Line3(vertices[7], vertices[4]));
+			volumeLines.push(new THREE.Line3(volumeVertices[0], volumeVertices[3]));
+			volumeLines.push(new THREE.Line3(volumeVertices[3], volumeVertices[6]));
+			volumeLines.push(new THREE.Line3(volumeVertices[6], volumeVertices[7]));
+			volumeLines.push(new THREE.Line3(volumeVertices[3], volumeVertices[4]));
 			// scene.add( new AxesHelper( 128 ) );
 
 			// Lighting is baked into the shader a.t.m.
@@ -260,7 +262,7 @@
 				
 				let texture3D = new THREE.DataTexture3D( volume.data, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
 				//let texture3D = new THREE.DataTexture3D( testData, TEXTURE_SIZE_X, TEXTURE_SIZE_Y, TEXTURE_SIZE_Z );
-				texture3D.format = THREE.LuminanceFormat;
+				texture3D.format = THREE.RedFormat;
 				texture3D.type = THREE.UnsignedByteType;
 				texture3D.minFilter = texture3D.magFilter = THREE.LinearFilter;
 				texture3D.unpackAlignment = 1;
@@ -291,23 +293,25 @@
 			planeNormal.normalize();
 
 			// Plane offset
-			let nearest = getClosestVertex(vertices, camera.position);
+			let nearest = getClosestVertex(volumeVertices, camera.position);
 			viewingDir.set(lookAt, camera.position);
-			viewingDir.closestPointToPoint(nearest, false, offset);
+			viewingDir.closestPointToPoint(nearest.vertex, false, offset);
 
 			planeOffset = offset.sub(lookAt).length();
 			numSlices = Math.round(planeOffset / planeInc) * 2;
 			uniforms.u_slices.value.z = numSlices;
 			planeOffset *= -1;
+			// Prevent co=planar issues
+			planeOffset += planeInc;
 			intersectPlane.set(planeNormal, planeOffset);
 
+			// Get intersection points
+			let intersectionPoints;
 			for (let slice=0; slice<numSlices; ++slice) {
 				currentGeometry = new THREE.Geometry();
-				for (let i=0, numLines=lines.length; i<numLines; ++i) {
-					intersects = intersectPlane.intersectLine(lines[i], intersectPoint);
-					if (intersects) {
-						currentGeometry.vertices.push(new THREE.Vector3().copy(intersectPoint));
-					}
+				intersectionPoints = getIntersectionPoints(nearest.nearest, intersectPlane);
+				for (let i=0, numPoints=intersectionPoints.length; i<numPoints; ++i) {
+					currentGeometry.vertices.push(new THREE.Vector3().copy(intersectionPoints[i]));
 				}
 				// Advance plane
 				planeOffset += planeInc;
@@ -321,10 +325,116 @@
 					continue;
 				}
 				
-				orderVertices(currentGeometry, camera.matrixWorldInverse);
-				currentMesh = new THREE.Mesh(currentGeometry, cubeMat);
+				//orderVertices(currentGeometry, camera.matrixWorldInverse);
+				orderFaces(currentGeometry);
+
+				currentMesh = new THREE.Mesh(currentGeometry, volumeShader);
 				volumeGroup.add(currentMesh);
 			}
+		}
+
+		function getIntersectionPoints(nearestVertex, intersectPlane) {
+			lineIndices.length = 0;
+			switch (nearestVertex) {
+				case 0:
+					lineIndices.push(0, 1);
+					lineIndices.push(1, 4);
+					lineIndices.push(4, 7);
+					lineIndices.push(1, 5);
+					lineIndices.push(0, 2);
+					lineIndices.push(2, 5);
+					lineIndices.push(5, 7);
+					lineIndices.push(2, 6);
+					lineIndices.push(0, 3);
+					lineIndices.push(3, 6);
+					lineIndices.push(6, 7);
+					lineIndices.push(3, 4);
+					break;
+
+				case 1:
+					break;
+
+				case 2:
+					break;
+
+				case 3:
+					break;
+
+				case 4:
+					break;
+
+				case 5:
+					break;
+
+				case 6:
+					break;
+
+				case 7:
+					break;
+
+				default:
+					break;
+
+			}
+			// Set line segments
+			let currentIndex = 0
+			let currentStart;
+			let currentEnd;
+			for (let i=0, numSegs=lineIndices.length/2; i<numSegs; ++i) {
+				currentStart = lineIndices[currentIndex];
+				currentEnd = lineIndices[currentIndex + 1];
+				volumeLines[i].set(volumeVertices[currentStart], volumeVertices[currentEnd]);
+				currentIndex += 2;
+			}
+
+			// Get intersections
+			let intersectionPoints = [];
+			let intersects;
+			intersects = getLineIntersections([0, 1, 2], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			intersects = getLineIntersections([3], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			intersects = getLineIntersections([4, 5, 6], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			intersects = getLineIntersections([7], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			intersects = getLineIntersections([8, 9, 10], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			intersects = getLineIntersections([11], intersectPlane);
+			if (intersects) {
+				intersectionPoints.push(intersects);
+			}
+
+			return intersectionPoints;
+		}
+
+		function getLineIntersections(lineNumbers, plane) {
+			let intersects;
+			let intersectPoint = new THREE.Vector3();
+
+			for (let i=0, numLines=lineNumbers.length; i<numLines; ++i) {
+				intersects = plane.intersectLine(volumeLines[lineNumbers[i]], intersectPoint);
+				if (intersects) {
+					return intersectPoint;
+				}
+			}
+
+			return false;
 		}
 
 		function compareNumbers(a, b) {
@@ -425,6 +535,36 @@
 			}
 		}
 
+		function orderFaces(geometry) {
+			switch(geometry.vertices.length) {
+				case 3:
+					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					break;
+
+				case 4:
+					geometry.faces.push( new THREE.Face3(0, 2, 1));
+					geometry.faces.push( new THREE.Face3(0, 3, 2));
+					break;
+
+				case 5:
+					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					geometry.faces.push( new THREE.Face3(2, 4, 0));
+					geometry.faces.push( new THREE.Face3(4, 2, 3));
+					break;
+
+				case 6:
+					geometry.faces.push( new THREE.Face3(0, 1, 2));
+					geometry.faces.push( new THREE.Face3(2, 5, 0));
+					geometry.faces.push( new THREE.Face3(2, 4, 5));
+					geometry.faces.push( new THREE.Face3(2, 3, 4));
+					break;
+
+				default:
+					console.log("Too many points = ", geometry.vertices.length);
+					break;
+			}
+		}
+
 		function getClosestVertex(vertices, point) {
 			let nearestDistance = 100000;
 			let distance;
@@ -438,7 +578,10 @@
 				}
 			}
 
-			return vertices[nearestVertex];
+			return {
+				nearest: nearestVertex,
+				vertex: vertices[nearestVertex]
+			}
 		}
 
 		function onWindowResize() {
