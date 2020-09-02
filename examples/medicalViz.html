@@ -118,7 +118,7 @@
 		let endSlice = 1;
 		let redMaterial;
 		const MIN_SLICE = 0;
-		const MAX_SLICE = 221;
+		const MAX_SLICE = 1000;
 		let displayElem = document.getElementById("sliceNum");
 
 		init();
@@ -183,14 +183,13 @@
 			pointLight.position.set(400,400,400);
 			pointLight.name = 'PointLight';
 			scene.add(pointLight);
-
-			// Reference cube
+			
 			let cubeGeom2 = new THREE.BoxBufferGeometry( 160, 256, 221 );
 			wireframe = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
 			
 			redMaterial = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: true } );
 			let cube2 = new THREE.Mesh(cubeGeom2, redMaterial);
-			scene.add(cube2);
+			//scene.add(cube2);
 
 			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
 
@@ -266,6 +265,9 @@
 
 			// Lighting is baked into the shader a.t.m.
 			// var dirLight = new DirectionalLight( 0xffffff );
+
+			// Reference cube
+			createReferenceCube();
 
 			// Load the data ...
 			new NRRDLoader().load( "models/nrrd/MRIDataPNG.nrrd", function ( volume ) {
@@ -472,6 +474,17 @@
 			}
 
 			return false;
+		}
+
+		function createReferenceCube() {
+			let sphereGeom = new THREE.SphereBufferGeometry(5);
+			let sphere;
+			let redSolidMat = new THREE.MeshLambertMaterial( { color: 0xff0000});
+			for (let i=0, numPoints=volumeVertices.length; i<numPoints; ++i) {
+				sphere = new THREE.Mesh(sphereGeom, redSolidMat);
+				sphere.position.copy(volumeVertices[i]);
+				scene.add(sphere);
+			}
 		}
 
 		function compareNumbers(a, b) {
