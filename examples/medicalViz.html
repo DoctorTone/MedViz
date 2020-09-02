@@ -123,6 +123,24 @@
 
 		function init() {
 
+			// Use keys to advance through volume
+			document.onkeypress = function(e) {
+				switch (e.key) {
+					case "w":
+						++startSlice;
+						renderUpdate = true;
+						break;
+
+					case "s":
+						--startSlice;
+						renderUpdate = true;
+						break;
+
+					default:
+						break;
+				}
+			}
+
 			scene = new THREE.Scene();
 			scene.add(volumeGroup);
 
@@ -310,12 +328,12 @@
 			uniforms.u_slices.value.z = numSlices;
 			planeOffset *= -1;
 			// Prevent co=planar issues
-			planeOffset += planeInc;
+			planeOffset += (planeInc * startSlice);
 			intersectPlane.set(planeNormal, planeOffset);
 
 			// Get intersection points
 			let intersectionPoints;
-			for (let slice=startSlice; slice<endSlice; ++slice) {
+			for (let slice=0; slice<1; ++slice) {
 				currentGeometry = new THREE.Geometry();
 				intersectionPoints = getIntersectionPoints(nearest.nearest, intersectPlane);
 				for (let i=0, numPoints=intersectionPoints.length; i<numPoints; ++i) {
