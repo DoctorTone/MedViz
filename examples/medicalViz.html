@@ -10,6 +10,11 @@
 <body>
 	<div id="inset"></div>
 
+	<div class="panel">
+		<p>
+			Slice = <span id="sliceNum">0</span>
+		</p>
+	</div>
 	<script type="module">
 		import * as THREE from '../build/three.module.js';
 
@@ -107,8 +112,11 @@
 		let currentGeometry;
 		let currentMesh;
 		let volumeGroup = new THREE.Group();
-		let cubeMat2;
+		let wireframe;
 		let sliceGeomMat;
+		let startSlice = 0;
+		let endSlice = 1;
+		let displayElem = document.getElementById("sliceNum");
 
 		init();
 		animate();
@@ -151,9 +159,9 @@
 
 			// Reference cube
 			let cubeGeom2 = new THREE.BoxBufferGeometry( 160, 256, 221 );
-			cubeMat2 = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
+			wireframe = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
 			
-			let cube2 = new THREE.Mesh(cubeGeom2, cubeMat2);
+			let cube2 = new THREE.Mesh(cubeGeom2, wireframe);
 			//scene.add(cube2);
 
 			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
@@ -307,7 +315,7 @@
 
 			// Get intersection points
 			let intersectionPoints;
-			for (let slice=0; slice<numSlices; ++slice) {
+			for (let slice=startSlice; slice<endSlice; ++slice) {
 				currentGeometry = new THREE.Geometry();
 				intersectionPoints = getIntersectionPoints(nearest.nearest, intersectPlane);
 				for (let i=0, numPoints=intersectionPoints.length; i<numPoints; ++i) {
@@ -328,9 +336,10 @@
 				//orderVertices(currentGeometry, camera.matrixWorldInverse);
 				orderFaces(currentGeometry);
 
-				currentMesh = new THREE.Mesh(currentGeometry, volumeShader);
+				currentMesh = new THREE.Mesh(currentGeometry, wireframe);
 				volumeGroup.add(currentMesh);
 			}
+			displayElem.textContent = startSlice;
 		}
 
 		function getIntersectionPoints(nearestVertex, intersectPlane) {
