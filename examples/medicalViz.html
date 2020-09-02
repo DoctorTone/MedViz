@@ -116,6 +116,8 @@
 		let sliceGeomMat;
 		let startSlice = 0;
 		let endSlice = 1;
+		const MIN_SLICE = 0;
+		const MAX_SLICE = 221;
 		let displayElem = document.getElementById("sliceNum");
 
 		init();
@@ -128,11 +130,17 @@
 				switch (e.key) {
 					case "w":
 						++startSlice;
+						if (startSlice >= MAX_SLICE) {
+							startSlice = MAX_SLICE;
+						}
 						renderUpdate = true;
 						break;
 
 					case "s":
 						--startSlice;
+						if (startSlice < 0) {
+							startSlice = 0;
+						}
 						renderUpdate = true;
 						break;
 
