@@ -55,13 +55,13 @@
 			varying vec4 texPosition;
 
 			void main() {
-				vec3 texCoords = vec3((texPosition.x/u_slices.x) + 0.5, (texPosition.y/u_slices.y) + 0.5, (texPosition.z/221.0) + 0.5);
+				vec3 texCoords = vec3((texPosition.x/u_slices.x) + 0.5, (texPosition.y/u_slices.y) + 0.5, (texPosition.z/u_slices.z) + 0.5);
 				//vec3 texCoords = vec3(1.0, 1.0, 0.0);
 				//float intensity = texture(u_data, texCoords).r;
 				//vec3 color = vec3(intensity, intensity, intensity);
 				//vec3 intensity = texture(u_data, texCoords);
 				gl_FragColor = texture(u_data, texCoords);
-				if (gl_FragColor.r < 0.5) {
+				if (gl_FragColor.r < 0.05) {
 					discard;
 				}
 				gl_FragColor.g = gl_FragColor.b = gl_FragColor.a = gl_FragColor.r;
@@ -220,7 +220,7 @@
 			
 			redMaterial = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: true } );
 			cube2 = new THREE.Mesh(cubeGeom2, wireframeRed);
-			scene.add(cube2);
+			//scene.add(cube2);
 
 			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
 
@@ -228,7 +228,7 @@
 			let planeGeom = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE, PLANE_SEGMENTS, PLANE_SEGMENTS);
 			let planeMat = new THREE.MeshLambertMaterial( { color: 0xffffff, side: THREE.DoubleSide, wireframe: false});
 			viewingPlane = new THREE.Mesh(planeGeom, planeMat);
-			scene.add(viewingPlane);
+			//scene.add(viewingPlane);
 
 			controls.staticMoving = true;
         	controls.dynamicDampingFactor = 0.3;
@@ -304,7 +304,7 @@
 			// var dirLight = new DirectionalLight( 0xffffff );
 
 			// Reference cube
-			createReferenceCube();
+			//createReferenceCube();
 
 			// Load the data ...
 			new NRRDLoader().load( "models/nrrd/MRIDataPNG.nrrd", function ( volume ) {
@@ -381,15 +381,16 @@
 
 			planeOffset = offset.sub(lookAt).length();
 			numSlices = Math.round(planeOffset / planeInc) * 2;
-			uniforms.u_slices.value.z = numSlices;
+			//uniforms.u_slices.value.z = numSlices;
 			planeOffset *= -1;
 			// Prevent co=planar issues
-			planeOffset += (planeInc * startSlice);
+			//planeOffset += (planeInc * startSlice);
+			planeOffset += planeInc;
 			intersectPlane.set(planeNormal, planeOffset);
 
 			// Get intersection points
 			let intersectionPoints;
-			for (let slice=0; slice<1; ++slice) {
+			for (let slice=1; slice<numSlices; ++slice) {
 				currentGeometry = new THREE.Geometry();
 				intersectionPoints = getIntersectionPoints(nearest.nearest, intersectPlane);
 				for (let i=0, numPoints=intersectionPoints.length; i<numPoints; ++i) {
@@ -400,7 +401,7 @@
 				intersectPlane.set(planeNormal, planeOffset);
 
 				// Viewing plane
-				viewingPlane.position.copy(planeNormal.multiplyScalar(planeOffset * -1));
+				//viewingPlane.position.copy(planeNormal.multiplyScalar(planeOffset * -1));
 
 				// Remove duplicates
 				currentGeometry.mergeVertices();
