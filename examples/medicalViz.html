@@ -10,9 +10,14 @@
 <body>
 	<div id="inset"></div>
 
-	<div class="panel">
+	<div id="sliceNumPanel" class="panel">
 		<p>
 			Slice = <span id="sliceNum">0</span>
+		</p>
+	</div>
+	<div id="lockedPanel" class="panel">
+		<p>
+			Lock = <span id="locked">Off</span>
 		</p>
 	</div>
 	<script type="module">
@@ -112,17 +117,23 @@
 		let currentGeometry;
 		let currentMesh;
 		let volumeGroup = new THREE.Group();
-		let wireframe;
+		let wireframeRed;
+		let wireframeWhite;
+		let renderWireframe = false;
 		let sliceGeomMat;
 		let startSlice = 0;
 		let endSlice = 1;
 		let redMaterial;
+		let cube2;
 		const MIN_SLICE = 0;
 		const MAX_SLICE = 2000;
 		let viewingPlane;
 		let tempX;
 		let renderOveride = false;
+		const PLANE_SEGMENTS = 8;
+		const PLANE_SIZE = 400;
 		let displayElem = document.getElementById("sliceNum");
+		let lockDisplay = document.getElementById("locked");
 
 		init();
 		animate();
@@ -150,6 +161,18 @@
 
 					case "l":
 						renderOveride = true;
+						lockDisplay.textContent = "On";
+						break;
+
+					case "u":
+						renderOveride = false;
+						lockDisplay.textContent = "Off";
+						break;
+
+					case "b":
+						renderWireframe = !renderWireframe;
+						viewingPlane.material.wireframe = renderWireframe;
+						cube2.material.wireframe = renderWireframe;
 						break;
 
 					default:
@@ -192,17 +215,18 @@
 			scene.add(pointLight);
 			
 			let cubeGeom2 = new THREE.BoxBufferGeometry( 160, 256, 221 );
-			wireframe = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
+			wireframeRed = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: false});
+			wireframeWhite = new THREE.MeshLambertMaterial( { color: 0xffffff, wireframe: true});
 			
 			redMaterial = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: true } );
-			let cube2 = new THREE.Mesh(cubeGeom2, redMaterial);
-			//scene.add(cube2);
+			cube2 = new THREE.Mesh(cubeGeom2, wireframeRed);
+			scene.add(cube2);
 
 			sliceGeomMat = new THREE.MeshLambertMaterial( { color: 0xd9d9d9, wireframe: true});
 
 			// Viewing plane
-			let planeGeom = new THREE.PlaneGeometry(300, 300, 4, 4);
-			let planeMat = new THREE.MeshLambertMaterial( { color: 0xff0000, wireframe: true});
+			let planeGeom = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE, PLANE_SEGMENTS, PLANE_SEGMENTS);
+			let planeMat = new THREE.MeshLambertMaterial( { color: 0xffffff, side: THREE.DoubleSide, wireframe: false});
 			viewingPlane = new THREE.Mesh(planeGeom, planeMat);
 			scene.add(viewingPlane);
 
@@ -349,7 +373,8 @@
 			viewingDir.closestPointToPoint(nearest.vertex, false, offset);
 
 			// Viewing plane
-			viewingPlane.position.set(offset.x, offset.y, offset.z);
+			viewingPlane.position.copy(offset);
+			viewingPlane.lookAt(lookAt);
 
 			// DEBUG
 			//console.log("Offset = ", offset);
@@ -374,6 +399,9 @@
 				planeOffset += planeInc;
 				intersectPlane.set(planeNormal, planeOffset);
 
+				// Viewing plane
+				viewingPlane.position.copy(planeNormal.multiplyScalar(planeOffset * -1));
+
 				// Remove duplicates
 				currentGeometry.mergeVertices();
 
@@ -385,7 +413,8 @@
 				//orderVertices(currentGeometry, camera.matrixWorldInverse);
 				orderFaces(currentGeometry);
 
-				currentMesh = new THREE.Mesh(currentGeometry, wireframe);
+				//currentMesh = new THREE.Mesh(currentGeometry, wireframeWhite);
+				currentMesh = new THREE.Mesh(currentGeometry, volumeShader);
 				volumeGroup.add(currentMesh);
 			}
 			displayElem.textContent = startSlice;
@@ -616,16 +645,16 @@
 					break;
 
 				case 5:
-					geometry.faces.push( new THREE.Face3(0, 1, 2));
-					geometry.faces.push( new THREE.Face3(2, 4, 0));
-					geometry.faces.push( new THREE.Face3(4, 2, 3));
+					geometry.faces.push( new THREE.Face3(0, 2, 1));
+					geometry.faces.push( new THREE.Face3(0, 3, 2));
+					geometry.faces.push( new THREE.Face3(0, 4, 3));
 					break;
 
 				case 6:
-					geometry.faces.push( new THREE.Face3(0, 1, 2));
-					geometry.faces.push( new THREE.Face3(2, 5, 0));
-					geometry.faces.push( new THREE.Face3(2, 4, 5));
-					geometry.faces.push( new THREE.Face3(2, 3, 4));
+					geometry.faces.push( new THREE.Face3(0, 2, 1));
+					geometry.faces.push( new THREE.Face3(0, 3, 2));
+					geometry.faces.push( new THREE.Face3(0, 4, 3));
+					geometry.faces.push( new THREE.Face3(0, 5, 4));
 					break;
 
 				default:
